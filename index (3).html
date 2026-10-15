@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gold Paper Trading – NPR</title>
+<style>
+:root{--bg:#0e1118;--p:#161b26;--t:#e6e9ef;--m:#8b93a5;--g:#22ab94;--r:#f23645;--y:#f5b400;--b:#2a3244}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--t);font:13px system-ui,sans-serif;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:8px 14px;background:var(--p);border-bottom:1px solid var(--b)}
+h1{font-size:15px;margin:0;color:var(--y)}
+.st{display:flex;gap:16px;flex-wrap:wrap}.st div{font-size:11px;color:var(--m)}.st b{display:block;font-size:14px;color:var(--t)}
+.goal{flex:1;min-width:220px;font-size:11px;color:var(--m)}.bar{height:8px;background:var(--b);border-radius:4px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;width:0;background:var(--g)}
+main{flex:1;display:flex;min-height:0}
+#wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+.tb{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:6px;background:var(--p);border-bottom:1px solid var(--b)}
+.tb button{width:auto;padding:4px 8px}.tb label{flex-direction:row;align-items:center;gap:3px}.tb input{width:auto;padding:0}
+.sep{width:1px;height:18px;background:var(--b)}
+canvas{flex:1;width:100%;min-height:0;display:block;cursor:crosshair;touch-action:none}
+aside{width:310px;overflow:auto;border-left:1px solid var(--b);background:var(--p);padding:10px}
+@media(max-width:850px){main{flex-direction:column}aside{width:100%;border:0;border-top:1px solid var(--b)}#wrap{min-height:480px}}
+button,input{font:inherit;color:var(--t);background:var(--bg);border:1px solid var(--b);border-radius:5px;padding:6px 8px;width:100%}
+button{cursor:pointer}button.on{background:var(--y);color:#000;border-color:var(--y)}
+.buy{background:var(--g)!important;border:0;font-weight:700;color:#fff;padding:11px}.sell{background:var(--r)!important;border:0;font-weight:700;color:#fff;padding:11px}
+.f{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--m)}
+.row{display:flex;gap:6px}h3{margin:12px 0 6px;font-size:12px;color:var(--m);text-transform:uppercase;letter-spacing:.05em}
+table{width:100%;border-collapse:collapse;font-size:11px}td,th{padding:4px 3px;text-align:right;border-bottom:1px solid var(--b)}th{color:var(--m);font-weight:500}td:first-child,th:first-child{text-align:left}
+.pos{color:var(--g)}.neg{color:var(--r)}small{color:var(--m)}td button{padding:1px 5px;width:auto;font-size:10px}
+</style></head><body>
+<header>
+<h1>🪙 Gold Paper Trader · NPR</h1>
+<div class="st"><div>Balance<b id="bal"></b></div><div>Equity<b id="eq"></b></div><div>Open P&amp;L<b id="upl"></b></div><div>Gold USD/oz<b id="px">…</b></div><div>Feed<b id="fd">…</b></div><div>Nepal time<b id="clk"></b></div></div>
+<div class="goal"><span id="gt"></span><div class="bar"><i id="gb"></i></div></div>
+</header>
+<main>
+<section id="wrap">
+<div class="tb" id="tb">
+<span id="tfs"></span><span class="sep"></span>
+<label><input type="checkbox" id="sma" checked>SMA20</label><label><input type="checkbox" id="ema" checked>EMA50</label>
+<label><input type="checkbox" id="bb">Bollinger</label><label><input type="checkbox" id="rsi" checked>RSI</label><label><input type="checkbox" id="macd">MACD</label><label><input type="checkbox" id="vol" checked>Vol</label>
+<span class="sep"></span>
+<button id="d0" class="on">Cursor</button><button id="d1">Trend line</button><button id="d2">H-line</button><button id="d3">Box</button><button id="du">Undo</button><button id="dc">Clear</button>
+</div>
+<canvas id="c"></canvas>
+</section>
+<aside>
+<h3>New order (market)</h3>
+<div class="f">
+<label>Size (oz) <input id="qty" type="number" value="0.01" step="0.001" min="0.001"></label>
+<label>Leverage <input id="lev" type="number" value="100" min="1"></label>
+<label>Stop-loss distance ($) <input id="sl" type="number" step="0.1" placeholder="e.g. 5"></label>
+<label>Take-profit distance ($) <input id="tp" type="number" step="0.1" placeholder="e.g. 10"></label>
+<label>USD → NPR <input id="fx" type="number" step="0.01" value="140"></label>
+<label>Margin (NPR) <input id="mg" disabled></label>
+</div>
+<div class="row"><button class="buy" id="buy">BUY</button><button class="sell" id="sell">SELL</button></div>
+<small id="hint"></small>
+<h3>Open positions</h3>
+<table><thead><tr><th>Side</th><th>Entry / time</th><th>P&amp;L</th><th></th></tr></thead><tbody id="pos"></tbody></table>
+<button id="closeall" style="margin-top:6px">Close all</button>
+<small>Tip: drag the red SL / green TP line on the chart to move it.</small>
+<h3>History</h3>
+<table><thead><tr><th>Side</th><th>In → Out / time</th><th>P&amp;L</th></tr></thead><tbody id="hist"></tbody></table>
+<button id="reset" style="margin-top:10px">Reset account to NPR 1000</button>
+</aside>
+</main>
+<script>
+const $=id=>document.getElementById(id),START=1000,GOAL=20000,TZ='Asia/Kathmandu';
+const TFS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+let S={bal:START,pos:[],hist:[],id:1,draw:[]};
+try{const x=JSON.parse(localStorage.goldNPR2);if(x)S=x}catch(e){}
+const save=()=>{try{localStorage.goldNPR2=JSON.stringify(S)}catch(e){}};
+const fT=new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:false});
+const fD=new Intl.DateTimeFormat('en-GB',{timeZone:TZ,day:'2-digit',month:'short'});
+const fDT=t=>fD.format(t)+' '+fT.format(t);
+const fx=()=>+$('fx').value||140,fmt=v=>(v<0?'-':'+')+'NPR '+Math.abs(v).toFixed(2),money=v=>'NPR '+v.toFixed(2);
+const pl=(p,pr)=>(p.side==='BUY'?pr-p.e:p.e-pr)*p.q*fx();
+let tfk='1m',C=[],price=0,live=true,fails=0,view=90,off=0,tool=0,pend=null,mouse=null,drag=null,dl=null,geo={hits:[]};
+const tm=()=>TFS[tfk]*1000;
+// ---------- data ----------
+const kl=j=>j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+const url=n=>`https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=${tfk}&limit=${n}`;
+function sim(){let p=price||4000,t=Math.floor(Date.now()/tm())*tm()-499*tm();C=[];
+ for(let i=0;i<500;i++){const o=p;let h=o,l=o;for(let k=0;k<5;k++){p+=(Math.random()-.5)*2*Math.sqrt(TFS[tfk]/60);h=Math.max(h,p);l=Math.min(l,p)}C.push({t:t+i*tm(),o,h,l,c:p,v:Math.random()*50})}}
+async function load(){const k=tfk;
+ try{const j=await (await fetch(url(500))).json();if(k!==tfk)return;C=kl(j);live=true;fails=0}catch(e){live=false;sim()}
+ price=C[C.length-1].c;off=0;ui();draw()}
+async function poll(){
+ if(live){const k=tfk;try{const j=kl(await (await fetch(url(2))).json());if(k!==tfk)return;
+   j.forEach(x=>{const L=C[C.length-1];if(x.t===L.t)C[C.length-1]=x;else if(x.t>L.t)C.push(x)});
+   price=C[C.length-1].c;fails=0}catch(e){fails++}}
+ else{price+=(Math.random()-.5)*.8;const L=C[C.length-1];if(Date.now()>=L.t+tm())C.push({t:L.t+tm(),o:price,h:price,l:price,c:price,v:1});
+   else{L.c=price;L.h=Math.max(L.h,price);L.l=Math.min(L.l,price)}}
+ checkExits();ui();draw()}
+// ---------- indicators ----------
+const sma=(a,n)=>a.map((_,i)=>i<n-1?null:a.slice(i-n+1,i+1).reduce((s,v)=>s+v,0)/n);
+function ema(a,n){const k=2/(n+1);let e=null;return a.map((v,i)=>{e=e===null?v:v*k+e*(1-k);return i<n-1?null:e})}
+function rsi(a,n=14){const r=[];let ag=0,al=0;a.forEach((v,i)=>{if(!i){r.push(null);return}const d=v-a[i-1],g=Math.max(d,0),l=Math.max(-d,0);
+ if(i<=n){ag+=g/n;al+=l/n;r.push(i===n?100-100/(1+ag/(al||1e-9)):null)}else{ag=(ag*(n-1)+g)/n;al=(al*(n-1)+l)/n;r.push(100-100/(1+ag/(al||1e-9)))}});return r}
+function bb(a,n=20){const m=sma(a,n);return a.map((_,i)=>{if(m[i]===null)return null;const s=a.slice(i-n+1,i+1),sd=Math.sqrt(s.reduce((q,v)=>q+(v-m[i])**2,0)/n);return[m[i]-2*sd,m[i],m[i]+2*sd]})}
+// ---------- chart ----------
+const cv=$('c'),cx=cv.getContext('2d');
+function draw(){
+ const dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;if(!W||!H||C.length<3)return;
+ if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
+ cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,W,H);cx.lineWidth=1;cx.font='11px system-ui';
+ const n=C.length,T=tm(),Rm=76,top=6,ax=20,subs=['rsi','macd'].filter(k=>$(k).checked),sh=Math.min(90,H*.17),mh=H-top-ax-subs.length*(sh+4);
+ off=Math.max(0,Math.min(off,n-5));
+ const li=n-1-off,cw=(W-Rm)/view,rightT=C[li].t+T*8,leftT=rightT-view*T,X=t=>(t-leftT)/T*cw+cw/2;
+ const vis=[];for(let i=0;i<=li;i++){const x=X(C[i].t);if(x>-cw)vis.push(i)}
+ const cl=C.map(x=>x.c),M=sma(cl,20),E=ema(cl,50),B=bb(cl),R=rsi(cl);
+ let hi=-1e18,lo=1e18;vis.forEach(i=>{hi=Math.max(hi,C[i].h);lo=Math.min(lo,C[i].l);if($('bb').checked&&B[i]){hi=Math.max(hi,B[i][2]);lo=Math.min(lo,B[i][0])}});
+ S.pos.forEach(p=>[p.e,p.sl,p.tp].forEach(v=>{if(v){hi=Math.max(hi,v);lo=Math.min(lo,v)}}));
+ const pd=(hi-lo)*.08||1;hi+=pd;lo-=pd;
+ const Y=p=>top+(hi-p)/(hi-lo)*mh,inv=y=>hi-(y-top)/mh*(hi-lo);
+ geo={X,Y,inv,cw,leftT,T,W,Rm,mh,top,ax,H,hits:[],tx:x=>leftT+(x-cw/2)/cw*T};
+ const G=getComputedStyle(document.documentElement).getPropertyValue('--g').trim(),Rd='#f23645',mu='#8b93a5',gr='#2a3244';
+ cx.fillStyle=mu;cx.strokeStyle=gr;
+ for(let i=0;i<=6;i++){const p=lo+(hi-lo)*i/6,y=Y(p);cx.beginPath();cx.moveTo(0,y);cx.lineTo(W-Rm,y);cx.stroke();cx.fillText(p.toFixed(2),W-Rm+5,y+3)}
+ // time axis
+ const sl=Math.max(1,Math.ceil(90/cw)),tr=Math.round(T/1000)>=86400;
+ vis.forEach(i=>{const t=C[i].t;if(Math.round(t/T)%sl)return;const x=X(t);if(x>W-Rm)return;cx.strokeStyle=gr;cx.beginPath();cx.moveTo(x,top);cx.lineTo(x,H-ax);cx.stroke();
+  cx.fillStyle=mu;const d=fD.format(t),tt=fT.format(t);cx.fillText(tr||tt==='00:00'?d:tt,x-14,H-6)});
+ cx.save();cx.beginPath();cx.rect(0,top,W-Rm,mh);cx.clip();
+ if($('vol').checked){let mx=1;vis.forEach(i=>mx=Math.max(mx,C[i].v));vis.forEach(i=>{const x=C[i];cx.fillStyle=x.c>=x.o?'#22ab9444':'#f2364544';const h=x.v/mx*mh*.15;cx.fillRect(X(x.t)-cw*.35,top+mh-h,cw*.7,h)})}
+ vis.forEach(i=>{const x=C[i],xx=X(x.t),up=x.c>=x.o;cx.strokeStyle=cx.fillStyle=up?G:Rd;cx.beginPath();cx.moveTo(xx,Y(x.h));cx.lineTo(xx,Y(x.l));cx.stroke();
+  cx.fillRect(xx-cw*.35,Y(Math.max(x.o,x.c)),Math.max(1,cw*.7),Math.max(1,Math.abs(Y(x.o)-Y(x.c))))});
+ const line=(a,col)=>{cx.strokeStyle=col;cx.lineWidth=1.5;cx.beginPath();let s=false;vis.forEach(i=>{if(a[i]==null)return;const x=X(C[i].t),y=Y(a[i]);s?cx.lineTo(x,y):cx.moveTo(x,y);s=true});cx.stroke();cx.lineWidth=1};
+ if($('sma').checked)line(M,'#f5b400');if($('ema').checked)line(E,'#4aa3ff');
+ if($('bb').checked)[0,1,2].forEach(k=>line(B.map(b=>b&&b[k]),k===1?'#9b8cff77':'#9b8cff'));
+ // drawings
+ cx.strokeStyle=cx.fillStyle='#ff7ad9';cx.lineWidth=1.5;
+ S.draw.forEach(d=>{if(d.k==='h'){const y=Y(d.p);cx.beginPath();cx.moveTo(0,y);cx.lineTo(W-Rm,y);cx.stroke()}
+  else if(d.k==='r'){const a=X(d.a.t),b=X(d.b.t),y1=Y(d.a.p),y2=Y(d.b.p);cx.globalAlpha=.15;cx.fillRect(a,y1,b-a,y2-y1);cx.globalAlpha=1;cx.strokeRect(a,y1,b-a,y2-y1)}
+  else{const a=[X(d.a.t),Y(d.a.p)],b=[X(d.b.t),Y(d.b.p)],m=(b[1]-a[1])/((b[0]-a[0])||1e-9);cx.beginPath();cx.moveTo(0,a[1]+m*(0-a[0]));cx.lineTo(W-Rm,a[1]+m*(W-Rm-a[0]));cx.stroke();cx.fillRect(a[0]-3,a[1]-3,6,6);cx.fillRect(b[0]-3,b[1]-3,6,6)}});
+ if(pend){cx.fillRect(X(pend.t)-3,Y(pend.p)-3,6,6);if(mouse){cx.setLineDash([4,4]);cx.beginPath();cx.moveTo(X(pend.t),Y(pend.p));cx.lineTo(mouse.x,mouse.y);cx.stroke();cx.setLineDash([])}}
+ cx.lineWidth=1;
+ // trade markers
+ const tri=(t,p,side,label,col)=>{const x=X(t),y=Y(p),u=side==='BUY';cx.fillStyle=col;cx.beginPath();
+  if(u){cx.moveTo(x,y+3);cx.lineTo(x-7,y+16);cx.lineTo(x+7,y+16)}else{cx.moveTo(x,y-3);cx.lineTo(x-7,y-16);cx.lineTo(x+7,y-16)}cx.fill();
+  cx.font='bold 11px system-ui';cx.fillText(label,x+9,u?y+15:y-8);cx.font='11px system-ui'};
+ S.hist.forEach(h=>{if(!h.t0)return;cx.strokeStyle=h.v>=0?G:Rd;cx.setLineDash([3,3]);cx.beginPath();cx.moveTo(X(h.t0),Y(h.e));cx.lineTo(X(h.t1),Y(h.x));cx.stroke();cx.setLineDash([]);
+  tri(h.t0,h.e,h.s,h.s,h.s==='BUY'?G:Rd);cx.fillStyle=h.v>=0?G:Rd;cx.beginPath();cx.arc(X(h.t1),Y(h.x),4,0,7);cx.fill();cx.fillText(h.why+' '+fmt(h.v),X(h.t1)+7,Y(h.x)-6)});
+ // position lines
+ const tag=(txt,y,col)=>{const w=cx.measureText(txt).width+12;cx.fillStyle=col;cx.fillRect(W-Rm-w-4,y-9,w,18);cx.fillStyle='#fff';cx.fillText(txt,W-Rm-w+2,y+4)};
+ const hl=(p,id,key,v,col,txt)=>{const y=Y(v);cx.strokeStyle=col;cx.setLineDash(key?[]:[6,3]);cx.lineWidth=key?1.5:1;cx.beginPath();cx.moveTo(0,y);cx.lineTo(W-Rm,y);cx.stroke();cx.setLineDash([]);cx.lineWidth=1;tag(txt,y,col);if(key)geo.hits.push({y,id,key})};
+ S.pos.forEach(p=>{tri(p.t0,p.e,p.side,p.side+' '+p.q+' @'+p.e.toFixed(2)+' '+fT.format(p.t0),p.side==='BUY'?G:Rd);
+  const v=pl(p,price);hl(p,p.id,null,p.e,'#f5b400',p.side+' '+p.q+'oz  '+fmt(v));
+  if(p.sl)hl(p,p.id,'sl',p.sl,Rd,'SL '+p.sl.toFixed(2)+'  '+fmt(pl(p,p.sl)));
+  if(p.tp)hl(p,p.id,'tp',p.tp,'#1b8a77','TP '+p.tp.toFixed(2)+'  '+fmt(pl(p,p.tp)))});
+ cx.restore();
+ // last price tag on axis
+ const last=C[C.length-1],ly=Y(price);cx.fillStyle=last.c>=last.o?G:Rd;cx.fillRect(W-Rm,ly-8,Rm,16);cx.fillStyle='#fff';cx.fillText(price.toFixed(2),W-Rm+5,ly+4);
+ // sub panels
+ let y0=top+mh+4;
+ const box=(label,f)=>{cx.strokeStyle=gr;cx.strokeRect(0,y0,W-Rm,sh);cx.fillStyle=mu;cx.fillText(label,6,y0+12);f(y0);y0+=sh+4};
+ const path=(a,Yf,col)=>{cx.strokeStyle=col;cx.beginPath();let s=false;vis.forEach(i=>{if(a[i]==null)return;const x=X(C[i].t);s?cx.lineTo(x,Yf(a[i])):cx.moveTo(x,Yf(a[i]));s=true});cx.stroke()};
+ if($('rsi').checked)box('RSI 14',y=>{const Yr=v=>y+sh-v/100*sh;[30,70].forEach(v=>{cx.strokeStyle=gr;cx.beginPath();cx.moveTo(0,Yr(v));cx.lineTo(W-Rm,Yr(v));cx.stroke();cx.fillStyle=mu;cx.fillText(v,W-Rm+5,Yr(v)+3)});path(R,Yr,'#c792ea')});
+ if($('macd').checked){const e12=ema(cl,12),e26=ema(cl,26),ml=cl.map((_,i)=>e12[i]==null||e26[i]==null?null:e12[i]-e26[i]),sg=ema(ml.map(v=>v??0),9),hs=ml.map((v,i)=>v==null?null:v-sg[i]);
+  box('MACD 12,26,9',y=>{let mx=1e-9;vis.forEach(i=>mx=Math.max(mx,Math.abs(ml[i]||0),Math.abs(sg[i]||0),Math.abs(hs[i]||0)));const Ym=v=>y+sh/2-v/mx*sh/2*.9;
+   vis.forEach(i=>{if(hs[i]==null)return;cx.fillStyle=hs[i]>=0?G:Rd;cx.fillRect(X(C[i].t)-cw*.3,Math.min(Ym(0),Ym(hs[i])),cw*.6,Math.abs(Ym(hs[i])-Ym(0)))});path(ml,Ym,'#4aa3ff');path(sg,Ym,'#f5b400')})}
+ // crosshair
+ if(mouse&&!drag&&!dl&&mouse.x<W-Rm){cx.strokeStyle=mu;cx.setLineDash([3,3]);cx.beginPath();cx.moveTo(mouse.x,top);cx.lineTo(mouse.x,H-ax);cx.moveTo(0,mouse.y);cx.lineTo(W-Rm,mouse.y);cx.stroke();cx.setLineDash([]);
+  if(mouse.y<top+mh){cx.fillStyle='#434a5c';cx.fillRect(W-Rm,mouse.y-8,Rm,16);cx.fillStyle='#fff';cx.fillText(inv(mouse.y).toFixed(2),W-Rm+5,mouse.y+4)}
+  const t=geo.tx(mouse.x),lb=fDT(t),w=cx.measureText(lb).width+10;cx.fillStyle='#434a5c';cx.fillRect(Math.min(mouse.x-w/2,W-Rm-w),H-ax,w,ax);cx.fillStyle='#fff';cx.fillText(lb,Math.min(mouse.x-w/2,W-Rm-w)+5,H-6)}
+}
+// ---------- interaction ----------
+const pos=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+const hit=m=>geo.hits.find(h=>Math.abs(h.y-m.y)<6&&m.x<geo.W-geo.Rm);
+cv.addEventListener('pointermove',e=>{mouse=pos(e);
+ if(dl){const p=S.pos.find(q=>q.id===dl.id);if(p){p[dl.key]=Math.round(geo.inv(mouse.y)*100)/100}}
+ else if(drag){off=Math.max(0,drag.off+Math.round((mouse.x-drag.x)/geo.cw))}
+ else cv.style.cursor=hit(mouse)?'ns-resize':tool?'copy':'crosshair';draw()});
+cv.addEventListener('pointerleave',()=>{mouse=null;draw()});
+cv.addEventListener('pointerdown',e=>{const m=pos(e);cv.setPointerCapture(e.pointerId);const h=hit(m);
+ if(h&&tool===0){dl=h;return}
+ if(tool===0){drag={x:m.x,off};return}
+ const pt={t:geo.tx(m.x),p:geo.inv(m.y)};
+ if(tool===2){S.draw.push({k:'h',p:pt.p});save()}else if(!pend)pend=pt;else{S.draw.push({k:tool===3?'r':'t',a:pend,b:pt});pend=null;save()}draw()});
+const up=()=>{if(dl){save();ui()}drag=null;dl=null};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{e.preventDefault();view=Math.min(400,Math.max(20,view+(e.deltaY>0?10:-10)));draw()},{passive:false});
+function setTool(k){tool=k;pend=null;[0,1,2,3].forEach(i=>$('d'+i).classList.toggle('on',i===k))}
+[0,1,2,3].forEach(i=>$('d'+i).onclick=()=>setTool(i));
+$('du').onclick=()=>{S.draw.pop();save();draw()};$('dc').onclick=()=>{S.draw=[];pend=null;save();draw()};
+$('tfs').innerHTML=Object.keys(TFS).map(k=>`<button data-k="${k}" class="${k===tfk?'on':''}">${k}</button>`).join(' ');
+$('tfs').onclick=e=>{const k=e.target.dataset.k;if(!k)return;tfk=k;[...$('tfs').children].forEach(b=>b.classList.toggle('on',b.dataset.k===k));load()};
+['sma','ema','bb','rsi','macd','vol'].forEach(id=>$(id).onchange=draw);addEventListener('resize',draw);
+// ---------- trading ----------
+function open(side){
+ if(!price)return alert('Waiting for price…');
+ const q=+$('qty').value,lev=+$('lev').value||1,m=price*q*fx()/lev,used=S.pos.reduce((s,p)=>s+p.m,0);
+ if(!(q>0))return;if(m>S.bal-used)return alert('Not enough free margin. Need '+money(m)+', free '+money(S.bal-used));
+ const sd=+$('sl').value||0,td=+$('tp').value||0,b=side==='BUY';
+ S.pos.push({id:S.id++,side,e:price,q,m,t0:Date.now(),sl:sd?price+(b?-sd:sd):null,tp:td?price+(b?td:-td):null});save();ui();draw()}
+function closeP(id,why,at){const i=S.pos.findIndex(p=>p.id===id);if(i<0)return;const p=S.pos[i],x=at??price,v=pl(p,x);
+ S.bal+=v;S.hist.unshift({s:p.side,e:p.e,x,v,why,t0:p.t0,t1:Date.now(),q:p.q});S.hist=S.hist.slice(0,30);S.pos.splice(i,1);save()}
+function setLv(id,k){const p=S.pos.find(q=>q.id===id);const v=parseFloat(prompt(k.toUpperCase()+' price (USD) for this trade:',p[k]||price));if(v>0){p[k]=v;save();ui();draw()}}
+function checkExits(){[...S.pos].forEach(p=>{const b=p.side==='BUY';
+ if(p.sl&&(b?price<=p.sl:price>=p.sl))closeP(p.id,'SL',p.sl);else if(p.tp&&(b?price>=p.tp:price<=p.tp))closeP(p.id,'TP',p.tp)});
+ if(S.pos.length&&S.bal+S.pos.reduce((s,p)=>s+pl(p,price),0)<=0)[...S.pos].forEach(p=>closeP(p.id,'Liquidated'))}
+$('buy').onclick=()=>open('BUY');$('sell').onclick=()=>open('SELL');
+$('closeall').onclick=()=>{[...S.pos].forEach(p=>closeP(p.id,'Manual'));ui();draw()};
+$('reset').onclick=()=>{if(confirm('Reset to NPR 1000?')){S={bal:START,pos:[],hist:[],id:1,draw:S.draw};save();ui();draw()}};
+['qty','lev','fx'].forEach(i=>$(i).oninput=ui);
+function ui(){
+ const u=price?S.pos.reduce((s,p)=>s+pl(p,price),0):0,eq=S.bal+u,prof=eq-START;
+ $('bal').textContent=money(S.bal);$('eq').textContent=money(eq);$('upl').textContent=fmt(u);$('upl').className=u>=0?'pos':'neg';
+ $('px').textContent=price?price.toFixed(2):'…';$('fd').textContent=live?(fails>3?'offline':'● live PAXG'):'simulated';$('fd').className=live&&fails<=3?'pos':'neg';
+ $('clk').textContent=fT.format(Date.now());
+ $('gt').textContent='Goal: profit NPR '+GOAL+' (equity NPR '+(START+GOAL)+') · Now '+fmt(prof)+(prof>=GOAL?' 🎉 GOAL REACHED':'');
+ $('gb').style.width=Math.max(0,Math.min(100,prof/GOAL*100))+'%';
+ const q=+$('qty').value||0,l=+$('lev').value||1;$('mg').value=price?(price*q*fx()/l).toFixed(2):'';
+ $('hint').textContent=price?'$1 move = NPR '+(q*fx()).toFixed(2)+' on this size':'';
+ $('pos').innerHTML=S.pos.map(p=>{const v=pl(p,price);return`<tr><td class="${p.side==='BUY'?'pos':'neg'}">${p.side} ${p.q}</td><td>${p.e.toFixed(2)}<br><small>${fDT(p.t0)}</small><br><button onclick="setLv(${p.id},'sl')">SL ${p.sl?p.sl.toFixed(1):'+'}</button> <button onclick="setLv(${p.id},'tp')">TP ${p.tp?p.tp.toFixed(1):'+'}</button></td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td><td><button onclick="closeP(${p.id},'Manual');ui();draw()">✕</button></td></tr>`}).join('')||'<tr><td colspan=4><small>None</small></td></tr>';
+ $('hist').innerHTML=S.hist.map(h=>`<tr><td>${h.s}</td><td>${h.e.toFixed(1)}→${h.x.toFixed(1)} <small>${h.why}<br>${h.t0?fDT(h.t0)+' → '+fT.format(h.t1):''}</small></td><td class="${h.v>=0?'pos':'neg'}">${h.v.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan=3><small>No trades yet</small></td></tr>';
+}
+load();setInterval(poll,1000);
+</script></body></html>
